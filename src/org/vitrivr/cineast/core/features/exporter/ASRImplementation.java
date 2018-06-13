@@ -25,9 +25,9 @@ import org.vitrivr.cineast.core.db.PersistencyWriterSupplier;
 import org.vitrivr.cineast.core.features.extractor.Extractor;
 import org.vitrivr.cineast.core.setup.EntityCreator;
 import org.vitrivr.cineast.core.util.LogHelper;
-import org.vitrivr.cineast.explorative.CommandLine;
+import java.io.File;
+import java.io.FileWriter;
 
-import javax.swing.plaf.basic.BasicInternalFrameTitlePane;
 
 /**
  * Exports deepspeech translation
@@ -47,7 +47,7 @@ public class ASRImplementation implements Extractor {
     /** Destination path for the audio-segment. */
     private Path destination;
 
-    private String pathToDeepSpeechModel = "/Users/TestProgram";
+    private String pathToDeepspeechModels = "/Users/Raphael/Desktop/DeepSpeech/models/";
 
     /**
      * Default constructor. The AudioSegmentExport can be configured via named properties
@@ -81,35 +81,55 @@ public class ASRImplementation implements Extractor {
             Files.createDirectories(directory);
             OutputStream stream = Files.newOutputStream(directory.resolve(shot.getId()+".wav"), CREATE, TRUNCATE_EXISTING);
 
-            String fileName = shot.getId()+".wav";
 
+
+
+            /* Extract mean samples and prepare byte buffer. */
+            short[] data = shot.getMeanSamplesAsShort();
+            ByteBuffer buffer = ByteBuffer.allocate(44 + data.length*2).order(ByteOrder.LITTLE_ENDIAN);
+
+            /* Write header of WAV file. */
+            this.writeWaveHeader(buffer, shot.getSamplingrate(), (short) 1, data.length); // ralph miscalculated this, should be data.length, not data.length * 2
+
+            /* Write actual data. */
+            for (short sample : data) {
+                buffer.putShort(sample);
+
+
+            }
+
+            stream.write(buffer.array());
+            stream.close();
+
+
+            String fileNameWav = shot.getId()+ ".wav";
+
+            String fileNameText = shot.getId() + ".txt";
+
+            String fileFolder = "/Users/Raphael/TestProgram/" + shot.getSuperId() + "/";
             //in mac oxs
-            String command = "deepspeech " + pathToDeepSpeechModel + "output_graph.pb " +
-                    pathToDeepSpeechModel + "alphabet.txt " +
-                    pathToDeepSpeechModel + "lm.binary " +
-                    pathToDeepSpeechModel + "trie " +
-                    fileName ;
+
+            String command = "deepspeech " + pathToDeepspeechModels + "output_graph.pbmm " +
+                    fileFolder + fileNameWav + " " +
+                    pathToDeepspeechModels + "alphabet.txt " +
+                    pathToDeepspeechModels + "lm.binary " +
+                    pathToDeepspeechModels + "trie ";
 
 
             String output = executeCommand(command);
             System.out.println(command + "\n");
             System.out.println(output);
 
-
-            /* Extract mean samples and perpare byte buffer. */
-            short[] data = shot.getMeanSamplesAsShort();
-            ByteBuffer buffer = ByteBuffer.allocate(44 + data.length*2).order(ByteOrder.LITTLE_ENDIAN);
-
-            /* Write header of WAV file. */
-            this.writeWaveHeader(buffer, 16000, data.length * 2);
-
-            /* Write actual data. */
-            for (short sample : data) {
-                buffer.putShort(sample);
+            try {
+                File file = new File(fileFolder + shot.getId() + ".txt");
+                FileWriter fileWriter = new FileWriter(file);
+                fileWriter.write(output);
+                fileWriter.flush();
+                fileWriter.close();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
 
-            stream.write(buffer.array());
-            stream.close();
 
 
         } catch (IOException | BufferOverflowException e) {
@@ -125,8 +145,7 @@ public class ASRImplementation implements Extractor {
      * @param length Length in bytes of the frames data
      */
 
-    private void writeWaveHeader(ByteBuffer buffer, float samplingrate,  int length) {
-        short channels = 1;
+    private void writeWaveHeader(ByteBuffer buffer, float samplingrate, short channels, int length) {
 
         /* Length of the subChunk2. */
         final int subChunk2Length = length * channels * (AudioFrame.BITS_PER_SAMPLE/8); /* Number of bytes for audio data: NumSamples * NumChannels * BitsPerSample/8. */
@@ -148,7 +167,8 @@ public class ASRImplementation implements Extractor {
 
         /* Data chunk */
         buffer.put("data".getBytes()); /* Begin of the data chunk. */
-        buffer.putInt(subChunk2Length); /* Length of the data chunk. */
+        /* Length of the data chunk. */
+        buffer.putInt(subChunk2Length);
     }
 
     private String executeCommand(String command) {
