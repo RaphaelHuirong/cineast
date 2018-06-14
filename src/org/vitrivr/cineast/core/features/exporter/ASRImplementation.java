@@ -10,21 +10,20 @@ import java.io.OutputStream;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.file.*;
 import java.util.HashMap;
 import java.util.function.Supplier;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.vitrivr.cineast.core.config.Config;
-import org.vitrivr.cineast.core.data.frames.AudioFrame;
 import org.vitrivr.cineast.core.data.segments.SegmentContainer;
 import org.vitrivr.cineast.core.db.PersistencyWriterSupplier;
 import org.vitrivr.cineast.core.features.extractor.Extractor;
 import org.vitrivr.cineast.core.setup.EntityCreator;
 import org.vitrivr.cineast.core.util.LogHelper;
+import org.vitrivr.cineast.core.util.WavExporter;
+
 import java.io.File;
 import java.io.FileWriter;
 
@@ -89,7 +88,9 @@ public class ASRImplementation implements Extractor {
             ByteBuffer buffer = ByteBuffer.allocate(44 + data.length*2).order(ByteOrder.LITTLE_ENDIAN);
 
             /* Write header of WAV file. */
-            this.writeWaveHeader(buffer, shot.getSamplingrate(), (short) 1, data.length); // ralph miscalculated this, should be data.length, not data.length * 2
+
+            WavExporter myWav = new WavExporter();
+            WavExporter.writeWaveHeader(buffer, shot.getSamplingrate(), (short) 1, data.length); // ralph miscalculated this, should be data.length, not data.length * 2
 
             /* Write actual data. */
             for (short sample : data) {
@@ -121,7 +122,7 @@ public class ASRImplementation implements Extractor {
             System.out.println(output);
 
             try {
-                File file = new File(fileFolder + shot.getId() + ".txt");
+                File file = new File(fileFolder + fileNameText);
                 FileWriter fileWriter = new FileWriter(file);
                 fileWriter.write(output);
                 fileWriter.flush();
@@ -130,6 +131,20 @@ public class ASRImplementation implements Extractor {
                 e.printStackTrace();
             }
 
+            /**
+             * Delete the WAV files
+             */
+
+            try {
+                Files.deleteIfExists(Paths.get(fileFolder + fileNameWav));
+            } catch(NoSuchFileException e) {
+                System.out.println("No such file/directory exists");
+            } catch(DirectoryNotEmptyException e) {
+                System.out.println("Directory is not empty.");
+            } catch(IOException e) {
+                System.out.println("Invalid permissions.");
+            }
+            System.out.println("Deletion successful.");
 
 
         } catch (IOException | BufferOverflowException e) {
@@ -137,39 +152,6 @@ public class ASRImplementation implements Extractor {
         }
     }
 
-    /**
-     * Writes the WAV header to the ByteBuffer (1 channel).
-     *
-     * @param buffer
-     * @param samplingrate Samplingrate of the output file.
-     * @param length Length in bytes of the frames data
-     */
-
-    private void writeWaveHeader(ByteBuffer buffer, float samplingrate, short channels, int length) {
-
-        /* Length of the subChunk2. */
-        final int subChunk2Length = length * channels * (AudioFrame.BITS_PER_SAMPLE/8); /* Number of bytes for audio data: NumSamples * NumChannels * BitsPerSample/8. */
-
-        /* RIFF Chunk. */
-        buffer.put("RIFF".getBytes());
-        buffer.putInt(36 + subChunk2Length);
-        buffer.put("WAVE".getBytes()); /* WAV format. */
-
-        /* Format chunk. */
-        buffer.put("fmt ".getBytes()); /* Begin of the format chunk. */
-        buffer.putInt(16); /* Length of the Format chunk. */
-        buffer.putShort((short)1); /* Format: 1 = Raw PCM (linear quantization). */
-        buffer.putShort((short)1); /* Number of channels. */
-        buffer.putInt((int)samplingrate); /* Samplingrate. */
-        buffer.putInt((int)(samplingrate * channels * (AudioFrame.BITS_PER_SAMPLE/8))); /* Byte rate: SampleRate * NumChannels * BitsPerSample/8 */
-        buffer.putShort((short)(channels * (AudioFrame.BITS_PER_SAMPLE/8))); /* Block align: NumChannels * BitsPerSample/8. */
-        buffer.putShort((short)(AudioFrame.BITS_PER_SAMPLE)) /* Bits per sample. */;
-
-        /* Data chunk */
-        buffer.put("data".getBytes()); /* Begin of the data chunk. */
-        /* Length of the data chunk. */
-        buffer.putInt(subChunk2Length);
-    }
 
     private String executeCommand(String command) {
 
