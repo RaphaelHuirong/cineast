@@ -107,7 +107,9 @@
 			"decoder": "FFMpegVideoDecoder",
 			"properties": {
 				"maxFrameWidth": 640,
-				"maxFrameHeight": 480
+				"maxFrameHeight": 480,
+				"samplerate": 16000,
+				"channels": 1
 			}
 		},
 		"IMAGE": {

@@ -13,10 +13,11 @@ public class WavExporter {
      * @param length Length in bytes of the frames data
      */
 
-    public static void writeWaveHeader(ByteBuffer buffer, float samplingrate, short channels, int length) {
+    public static double writeWaveHeader(ByteBuffer buffer, float samplingrate, short channels, int length) {
 
         /* Length of the subChunk2. */
         final int subChunk2Length = length * channels * (AudioFrame.BITS_PER_SAMPLE/8); /* Number of bytes for audio data: NumSamples * NumChannels * BitsPerSample/8. */
+
 
         /* RIFF Chunk. */
         buffer.put("RIFF".getBytes());
@@ -37,5 +38,13 @@ public class WavExporter {
         buffer.put("data".getBytes()); /* Begin of the data chunk. */
         /* Length of the data chunk. */
         buffer.putInt(subChunk2Length);
+
+        // calculate duration of the clip
+        // file.length() / format.getSampleRate() / (format.getSampleSizeInBits() / 8.0) / format.getChannels();
+
+
+        double durationInSeconds = subChunk2Length / channels / (AudioFrame.BITS_PER_SAMPLE / 8.0) / samplingrate ;
+
+        return durationInSeconds;
     }
 }

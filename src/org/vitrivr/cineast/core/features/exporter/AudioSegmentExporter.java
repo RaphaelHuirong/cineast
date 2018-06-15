@@ -82,7 +82,7 @@ public class AudioSegmentExporter implements Extractor {
 
             WavExporter myWav = new WavExporter();
 
-            WavExporter.writeWaveHeader(buffer, shot.getSamplingrate(), channels, data.length * 2);
+            myWav.writeWaveHeader(buffer, shot.getSamplingrate(), channels, data.length * 2);
 
             /* Write actual data. */
             for (short sample : data) {

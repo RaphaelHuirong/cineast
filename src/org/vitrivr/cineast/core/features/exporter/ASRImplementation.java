@@ -81,8 +81,6 @@ public class ASRImplementation implements Extractor {
             OutputStream stream = Files.newOutputStream(directory.resolve(shot.getId()+".wav"), CREATE, TRUNCATE_EXISTING);
 
 
-
-
             /* Extract mean samples and prepare byte buffer. */
             short[] data = shot.getMeanSamplesAsShort();
             ByteBuffer buffer = ByteBuffer.allocate(44 + data.length*2).order(ByteOrder.LITTLE_ENDIAN);
@@ -90,12 +88,12 @@ public class ASRImplementation implements Extractor {
             /* Write header of WAV file. */
 
             WavExporter myWav = new WavExporter();
-            WavExporter.writeWaveHeader(buffer, shot.getSamplingrate(), (short) 1, data.length); // ralph miscalculated this, should be data.length, not data.length * 2
+            double seconds = myWav.writeWaveHeader(buffer, shot.getSamplingrate(), (short) 1, data.length); // ralph miscalculated this, should be data.length, not data.length * 2
+
 
             /* Write actual data. */
             for (short sample : data) {
                 buffer.putShort(sample);
-
 
             }
 
@@ -105,7 +103,7 @@ public class ASRImplementation implements Extractor {
 
             String fileNameWav = shot.getId()+ ".wav";
 
-            String fileNameText = shot.getId() + ".txt";
+            //        String fileNameText = shot.getId() + ".txt";
 
             String fileFolder = "/Users/Raphael/TestProgram/" + shot.getSuperId() + "/";
             //in mac oxs
@@ -116,20 +114,22 @@ public class ASRImplementation implements Extractor {
                     pathToDeepspeechModels + "lm.binary " +
                     pathToDeepspeechModels + "trie ";
 
+            if (seconds >= 5 ) {
+                LOGGER.warn("file is longer than 5 seconds, deep speech model may not generate the ideal transcript");
+            }
 
             String output = executeCommand(command);
-            System.out.println(command + "\n");
-            System.out.println(output);
+            LOGGER.warn(output);
 
-            try {
-                File file = new File(fileFolder + fileNameText);
-                FileWriter fileWriter = new FileWriter(file);
-                fileWriter.write(output);
-                fileWriter.flush();
-                fileWriter.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+//            try {
+//                File file = new File(fileFolder + fileNameText);
+//                FileWriter fileWriter = new FileWriter(file);
+//                fileWriter.write(output);
+//                fileWriter.flush();
+//                fileWriter.close();
+//            } catch (IOException e) {
+//                e.printStackTrace();
+//            }
 
             /**
              * Delete the WAV files
